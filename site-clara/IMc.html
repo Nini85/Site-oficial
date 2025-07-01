@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>IMC Automático com Dobras</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      background-color: #000000;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .secao,
+    .observacoes {
+      background-color: #ffffff;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+
+    h2 {
+      color: #000000;
+    }
+
+    input,
+    select {
+      padding: 8px;
+      margin-top: 5px;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 20px auto 10px auto;
+      display: block;
+      font-weight: bold;
+      cursor: pointer;
+      background-color: #faf9f9;
+      color: rgb(0, 0, 0);
+      border: none;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background-color: #555;
+    }
+
+    p#resultado,
+    div#impressao {
+      margin-top: 10px;
+      white-space: pre-wrap;
+      /* para manter quebras de linha */
+      background-color: #ffffff;
+      padding: 15px;
+      border-radius: 8px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Caixa esquerda -->
+    <div class="secao">
+      <h2>Calculadora de IMC</h2>
+      <label for="sexo">Sexo:</label><br />
+      <select id="sexo">
+        <option value="">Selecione</option>
+        <option value="Mulher">Mulher</option>
+        <option value="Homem">Homem</option>
+      </select>
+      <br /><br />
+
+      <label for="nome">Nome:</label><br />
+      <input type="text" id="nome" /><br /><br />
+
+      <label for="idade">Idade (anos):</label><br />
+      <input type="number" id="idade" min="1" max="120" /><br /><br />
+
+      <label for="data">Data da Avaliação:</label><br />
+      <input type="date" id="data" /><br /><br />
+
+      <label for="peso">Peso (kg):</label><br />
+      <input type="number" id="peso" step="0.1" /><br /><br />
+
+      <label for="altura">Altura (m):</label><br />
+      <input type="number" id="altura" step="0.01" /><br /><br />
+
+      <p id="resultado"></p>
+    </div>
+
+    <!-- Caixa direita -->
+    <div class="observacoes">
+      <h2>Dobras Cutâneas</h2>
+
+      <label for="triceps">Tríceps (TR):</label><br />
+      <input type="number" id="triceps" step="0.1" /><br /><br />
+
+      <label for="subescapular">Subescapular (SB):</label><br />
+      <input type="number" id="subescapular" step="0.1" /><br /><br />
+
+      <label for="biceps">Bíceps (BI):</label><br />
+      <input type="number" id="biceps" step="0.1" /><br /><br />
+
+      <label for="axilar">Axilar média (AM):</label><br />
+      <input type="number" id="axilar" step="0.1" /><br /><br />
+
+      <label for="toracica">Torácica ou peitoral (TX):</label><br />
+      <input type="number" id="toracica" step="0.1" /><br /><br />
+
+      <label for="suprailiaca">Supra-ilíaca (SI):</label><br />
+      <input type="number" id="suprailiaca" step="0.1" /><br /><br />
+
+      <label for="supraespinal">Supra-espinal (SS):</label><br />
+      <input type="number" id="supraespinal" step="0.1" /><br /><br />
+
+      <label for="coxa">Coxa (CX):</label><br />
+      <input type="number" id="coxa" step="0.1" /><br /><br />
+
+      <label for="panturrilha">Panturrilha medial (PM):</label><br />
+      <input type="number" id="panturrilha" step="0.1" /><br /><br />
+    </div>
+  </div>
+
+  <div>> 
+     <a href="paginaprincipal.html">
+  <button>Pagina inicial</button>
+</a>
+    <button onclick="salvarDados()">Salvar dados do aluno</button>
+  <button onclick="imprimirDados()">Imprimir dados do aluno</button>
+  
+</div>
+
+
+
+  <!-- Área para imprimir dados (não usada mais, pode manter para debug) -->
+  <div id="impressao"></div>
+
+  <script>
+    let dadosIMC = [];
+
+    function classificarIMC(imc) {
+      if (imc < 18.5) return "Abaixo do peso";
+      if (imc < 25) return "Peso normal";
+      if (imc < 30) return "Acima do peso";
+      if (imc < 35) return "Obesidade Grau I";
+      if (imc < 40) return "Obesidade Grau II";
+      return "Obesidade Grau III";
+    }
+
+    // Função para calcular percentual de gordura corporal
+    // Fórmulas baseadas em Jackson & Pollock 7 dobras
+    function calcularPercentualGordura(sexo, idade, dobras) {
+      const somaDobras = [
+        "Triceps",
+        "Subescapular",
+        "Biceps",
+        "Axilar",
+        "Toracica",
+        "SupraIliaca",
+        "Supraespinal",
+      ]
+        .map((p) => parseFloat(dobras[p]) || 0)
+        .reduce((a, b) => a + b, 0);
+
+      let densidadeCorporal;
+      if (sexo === "Homem") {
+        densidadeCorporal =
+          1.112 -
+          0.00043499 * somaDobras +
+          0.00000055 * somaDobras ** 2 -
+          0.00028826 * idade;
+      } else if (sexo === "Mulher") {
+        densidadeCorporal =
+          1.097 -
+          0.00046971 * somaDobras +
+          0.00000056 * somaDobras ** 2 -
+          0.00012828 * idade;
+      } else {
+        return null;
+      }
+
+      const percentualGordura = ((4.95 / densidadeCorporal) - 4.5) * 100;
+      return percentualGordura.toFixed(2);
+    }
+
+    function salvarDados() {
+      const sexo = document.getElementById("sexo").value;
+      const nome = document.getElementById("nome").value;
+      const idade = parseInt(document.getElementById("idade").value);
+      const data = document.getElementById("data").value;
+      const peso = parseFloat(document.getElementById("peso").value);
+      const altura = parseFloat(document.getElementById("altura").value);
+
+      const triceps = parseFloat(document.getElementById("triceps").value);
+      const subescapular = parseFloat(
+        document.getElementById("subescapular").value
+      );
+      const biceps = parseFloat(document.getElementById("biceps").value);
+      const axilar = parseFloat(document.getElementById("axilar").value);
+      const toracica = parseFloat(document.getElementById("toracica").value);
+      const suprailiaca = parseFloat(
+        document.getElementById("suprailiaca").value
+      );
+      const supraespinal = parseFloat(
+        document.getElementById("supraespinal").value
+      );
+      const coxa = parseFloat(document.getElementById("coxa").value);
+      const panturrilha = parseFloat(document.getElementById("panturrilha").value);
+
+      const resultado = document.getElementById("resultado");
+
+      if (!sexo || !nome || isNaN(peso) || isNaN(altura) || isNaN(idade) || !data) {
+        resultado.innerText =
+          "Preencha todos os campos principais corretamente (incluindo idade e data).";
+        return;
+      }
+
+      const imc = peso / (altura * altura);
+      const imcFormatado = imc.toFixed(2);
+      const classificacao = classificarIMC(imc);
+
+      const dobras = {
+        Triceps: triceps,
+        Subescapular: subescapular,
+        Biceps: biceps,
+        Axilar: axilar,
+        Toracica: toracica,
+        SupraIliaca: suprailiaca,
+        Supraespinal: supraespinal,
+        Coxa: coxa,
+        Panturrilha: panturrilha,
+      };
+
+      const percentualGordura =
+        calcularPercentualGordura(sexo, idade, dobras) || "N/A";
+
+      resultado.innerText = `${nome}, seu IMC é ${imcFormatado} (${classificacao}) e seu percentual de gordura corporal estimado é ${percentualGordura}%`;
+
+      dadosIMC.push({
+        Sexo: sexo,
+        Nome: nome,
+        Idade: idade,
+        Data: data,
+        Peso: peso,
+        Altura: altura,
+        IMC: imcFormatado,
+        Classificação: classificacao,
+        PercentualGordura: percentualGordura,
+        Triceps: triceps || "",
+        Subescapular: subescapular || "",
+        Biceps: biceps || "",
+        Axilar: axilar || "",
+        Toracica: toracica || "",
+        SupraIliaca: suprailiaca || "",
+        Supraespinal: supraespinal || "",
+        Coxa: coxa || "",
+        Panturrilha: panturrilha || "",
+      });
+
+      exportarParaExcel();
+    }
+
+    function exportarParaExcel() {
+      const apenasIMC = dadosIMC.map((item) => ({
+        Sexo: item.Sexo,
+        Nome: item.Nome,
+        Idade: item.Idade,
+        Data: item.Data,
+        Peso: item.Peso,
+        Altura: item.Altura,
+        IMC: item.IMC,
+        Classificação: item.Classificação,
+        PercentualGordura: item.PercentualGordura,
+      }));
+      const ws1 = XLSX.utils.json_to_sheet(apenasIMC);
+
+      const apenasDobras = dadosIMC.map((item) => ({
+        Nome: item.Nome,
+        Triceps: item.Triceps,
+        Subescapular: item.Subescapular,
+        Biceps: item.Biceps,
+        Axilar: item.Axilar,
+        Toracica: item.Toracica,
+        SupraIliaca: item.SupraIliaca,
+        Supraespinal: item.Supraespinal,
+        Coxa: item.Coxa,
+        Panturrilha: item.Panturrilha,
+      }));
+      const ws2 = XLSX.utils.json_to_sheet(apenasDobras);
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws1, "IMC");
+      XLSX.utils.book_append_sheet(wb, ws2, "Dobras Cutâneas");
+      XLSX.writeFile(wb, "dados_imc.xlsx");
+    }
+
+    async function imprimirDados() {
+      if (dadosIMC.length === 0) {
+        alert("Nenhum dado salvo para imprimir.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      let y = 10; // posição vertical inicial
+      doc.setFontSize(14);
+      doc.text("----- Dados dos Alunos -----", 10, y);
+      y += 10;
+      doc.setFontSize(11);
+
+      dadosIMC.forEach((item, i) => {
+        if (y > 270) {
+          // Nova página se ultrapassar
+          doc.addPage();
+          y = 10;
+        }
+
+        doc.text(`Aluno ${i + 1}:`, 10, y);
+        y += 7;
+        doc.text(`Nome: ${item.Nome}`, 10, y);
+        y += 7;
+        doc.text(`Sexo: ${item.Sexo}`, 10, y);
+        y += 7;
+        doc.text(`Idade: ${item.Idade} anos`, 10, y);
+        y += 7;
+        doc.text(`Data da Avaliação: ${item.Data}`, 10, y);
+        y += 7;
+        doc.text(`Peso: ${item.Peso} kg`, 10, y);
+        y += 7;
+        doc.text(`Altura: ${item.Altura} m`, 10, y);
+        y += 7;
+        doc.text(`IMC: ${item.IMC} (${item.Classificação})`, 10, y);
+        y += 7;
+        doc.text(`Percentual de Gordura: ${item.PercentualGordura} %`, 10, y);
+        y += 7;
+        doc.text(`Dobras Cutâneas (mm):`, 10, y);
+        y += 7;
+        doc.text(`  Tríceps: ${item.Triceps}`, 15, y);
+        y += 7;
+        doc.text(`  Subescapular: ${item.Subescapular}`, 15, y);
+        y += 7;
+        doc.text(`  Bíceps: ${item.Biceps}`, 15, y);
+        y += 7;
+        doc.text(`  Axilar média: ${item.Axilar}`, 15, y);
+        y += 7;
+        doc.text(`  Torácica: ${item.Toracica}`, 15, y);
+        y += 7;
+        doc.text(`  Supra-ilíaca: ${item.SupraIliaca}`, 15, y);
+        y += 7;
+        doc.text(`  Supra-espinal: ${item.Supraespinal}`, 15, y);
+        y += 7;
+        doc.text(`  Coxa: ${item.Coxa}`, 15, y);
+        y += 7;
+        doc.text(`  Panturrilha: ${item.Panturrilha}`, 15, y);
+        y += 10;
+        doc.text("-----------------------------", 10, y);
+        y += 10;
+      });
+
+      doc.save("dados_alunos.pdf");
+    }
+  </script>
+</body>
+</html>
